@@ -33,6 +33,16 @@ class GTAHubBot(commands.Bot):
         await self.tree.sync()
         print("Slash commands sincronizados.")
 
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Falta un argumento requerido: `{error.param.name}`. Revisa la sintaxis del comando.")
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send("❌ Uno de los argumentos no es válido (por ejemplo, pusiste letras en vez de números).")
+        elif isinstance(error, commands.CommandNotFound):
+            pass  # Ignorar si el comando no existe
+        else:
+            await ctx.send(f"❌ Ocurrió un error al ejecutar el comando: {str(error)}")
+
     async def on_ready(self):
         print(f'Bot conectado exitosamente como {self.user} (ID: {self.user.id})')
         print('------')
