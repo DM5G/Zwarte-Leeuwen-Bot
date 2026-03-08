@@ -139,10 +139,16 @@ class Tickets(commands.Cog):
             return m.author == ctx.author and m.channel == ctx.channel
 
         # 1. Aesthetics
-        await ctx.send("🎨 **Paso 1/4:** Envía la URL del Banner principal del Panel de Tickets.")
+        await ctx.send("🎨 **Paso 1/4:** Sube la imagen del Banner principal del Panel de Tickets **adjuntándola** en tu mensaje. (O pega una URL).")
         try:
             msg = await self.bot.wait_for('message', timeout=120.0, check=check)
-            banner_url = msg.content
+            if msg.attachments:
+                banner_url = msg.attachments[0].url
+            else:
+                banner_url = msg.content.strip()
+                if not banner_url.startswith("http") and banner_url.lower() != "ninguno":
+                    await ctx.send("❌ No proporcionaste una imagen. Se creará sin banner.")
+                    banner_url = ""
         except TimeoutError:
             return await ctx.send("⌛ Tiempo agotado.")
 

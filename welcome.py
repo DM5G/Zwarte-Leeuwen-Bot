@@ -34,14 +34,17 @@ class Welcome(commands.Cog):
             await ctx.send("⌛ Tiempo agotado para el Paso 1. Configuración cancelada.")
             return
 
-        # 2. Ask for banner URL
-        await ctx.send("🖼️ **Paso 2/3:** Envía la URL de la imagen de fondo (Banner).")
+        # 2. Ask for banner URL / Attachment
+        await ctx.send("🖼️ **Paso 2/3:** Sube la imagen de fondo (Banner) **adjuntándola** en tu próximo mensaje. (Si prefieres, también puedes pegar una URL válida).")
         try:
             msg = await self.bot.wait_for('message', timeout=120.0, check=check)
-            banner_url = msg.content.strip()
-            if not banner_url.startswith("http"):
-                await ctx.send("❌ La URL proporcionada no es válida. Configuración cancelada.")
-                return
+            if msg.attachments:
+                banner_url = msg.attachments[0].url
+            else:
+                banner_url = msg.content.strip()
+                if not banner_url.startswith("http"):
+                    await ctx.send("❌ No se adjuntó ninguna imagen ni es una URL válida. Configuración cancelada.")
+                    return
         except TimeoutError:
             await ctx.send("⌛ Tiempo agotado para el Paso 2. Configuración cancelada.")
             return
