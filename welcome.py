@@ -10,14 +10,15 @@ class Welcome(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.group(invoke_without_command=True, name="set_welcome")
+    @commands.command(name="set_welcome")
     @commands.has_permissions(administrator=True)
-    async def set_welcome_group(self, ctx):
-        await ctx.send("Especifica qué quieres configurar. Ejemplo: `!set_welcome system`")
-
-    @set_welcome_group.command(name="system")
-    @commands.has_permissions(administrator=True)
-    async def welcome_system(self, ctx):
+    async def set_welcome(self, ctx, system: str = None):
+        """
+        Comando interactivo para configurar el sistema de bienvenida.
+        Uso: !set_welcome system
+        """
+        if system != "system":
+            return await ctx.send("Sintaxis incorrecta. Usa: `!set_welcome system`")
 
         def check(m):
             return m.author == ctx.author and m.channel == ctx.channel
@@ -27,15 +28,13 @@ class Welcome(commands.Cog):
         try:
             msg = await self.bot.wait_for('message', timeout=60.0, check=check)
             if not msg.channel_mentions:
-                await ctx.send("❌ No mencionaste ningún canal válido. Configuración cancelada.")
-                return
+                return await ctx.send("❌ No mencionaste ningún canal válido. Configuración cancelada. (Asegúrate de poner el # y hacer clic en el canal de la lista).")
             channel_id = msg.channel_mentions[0].id
         except TimeoutError:
-            await ctx.send("⌛ Tiempo agotado para el Paso 1. Configuración cancelada.")
-            return
+            return await ctx.send("⌛ Tiempo agotado para el Paso 1. Configuración cancelada.")
 
         # 2. Ask for banner URL / Attachment
-        await ctx.send("🖼️ **Paso 2/3:** Sube la imagen de fondo (Banner) **adjuntándola** en tu próximo mensaje. (Si prefieres, también puedes pegar una URL válida).")
+        await ctx.send("🖼️ **Paso 2/3:** Sube la imagen de fondo (Banner) **adjuntándola** en tu próximo mensaje. (Si prefieres, también puedes pegar una URL válida que empiece por http).")
         try:
             msg = await self.bot.wait_for('message', timeout=120.0, check=check)
             if msg.attachments:
@@ -43,11 +42,9 @@ class Welcome(commands.Cog):
             else:
                 banner_url = msg.content.strip()
                 if not banner_url.startswith("http"):
-                    await ctx.send("❌ No se adjuntó ninguna imagen ni es una URL válida. Configuración cancelada.")
-                    return
+                    return await ctx.send("❌ No se adjuntó ninguna imagen ni es una URL válida. Configuración cancelada.")
         except TimeoutError:
-            await ctx.send("⌛ Tiempo agotado para el Paso 2. Configuración cancelada.")
-            return
+            return await ctx.send("⌛ Tiempo agotado para el Paso 2. Configuración cancelada.")
 
         # 3. Ask for welcome message
         await ctx.send("📝 **Paso 3/3:** Escribe el mensaje de bienvenida. Puedes usar `@usuario` para mencionar al nuevo miembro.")
@@ -55,33 +52,36 @@ class Welcome(commands.Cog):
             msg = await self.bot.wait_for('message', timeout=300.0, check=check)
             welcome_message = msg.content
         except TimeoutError:
-            await ctx.send("⌛ Tiempo agotado para el Paso 3. Configuración cancelada.")
-            return
+            return await ctx.send("⌛ Tiempo agotado para el Paso 3. Configuración cancelada.")
 
         # Save to database
-        conn = database.get_connection()
-        cursor = conn.cursor()
-        
-        # Check if settings exist for this guild
-        cursor.execute("SELECT guild_id FROM welcome_settings WHERE guild_id = ?", (ctx.guild.id,))
-        exists = cursor.fetchone()
-        
-        if exists:
-            cursor.execute('''
-                UPDATE welcome_settings 
-                SET channel_id = ?, banner_url = ?, message = ?
-                WHERE guild_id = ?
-            ''', (channel_id, banner_url, welcome_message, ctx.guild.id))
-        else:
-            cursor.execute('''
-                INSERT INTO welcome_settings (guild_id, channel_id, banner_url, message)
-                VALUES (?, ?, ?, ?)
-            ''', (ctx.guild.id, channel_id, banner_url, welcome_message))
+        try:
+            conn = database.get_connection()
+            cursor = conn.cursor()
             
-        conn.commit()
-        conn.close()
+            # Check if settings exist for this guild
+            cursor.execute("SELECT guild_id FROM welcome_settings WHERE guild_id = ?", (ctx.guild.id,))
+            exists = cursor.fetchone()
+            
+            if exists:
+                cursor.execute('''
+                    UPDATE welcome_settings 
+                    SET channel_id = ?, banner_url = ?, message = ?
+                    WHERE guild_id = ?
+                ''', (channel_id, banner_url, welcome_message, ctx.guild.id))
+            else:
+                cursor.execute('''
+                    INSERT INTO welcome_settings (guild_id, channel_id, banner_url, message)
+                    VALUES (?, ?, ?, ?)
+                ''', (ctx.guild.id, channel_id, banner_url, welcome_message))
+                
+            conn.commit()
+            conn.close()
+            await ctx.send("✅ ¡Sistema de bienvenida configurado correctamente!")
+            
+        except sqlite3.Error as e:
+            await ctx.send(f"❌ Ocurrió un error al guardar en la base de datos: {e}")
 
-        await ctx.send("✅ ¡Sistema de bienvenida configurado correctamente!")
 
     async def create_welcome_card(self, avatar_url, banner_url, username):
         """Generates the welcome image using Pillow."""
